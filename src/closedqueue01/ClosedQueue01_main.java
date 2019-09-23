@@ -11,8 +11,9 @@ public class ClosedQueue01_main {
 	public static void main(String[] args) {
 		// TODO Auto-generated method stub
 		//Nステップ数、K拠点数
-		int N = 100, K = 17;
-		int user_node[] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};//0使用-1不使用
+		int N = 100, K = 14;
+		//int user_node[] = {0,0,0,0,-1,0,0,0,-1,0,-1,0,0,0};//0使用-1不使用
+		int user_node[] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0};//0使用-1不使用
 		for(int i = 0; i < user_node.length; i++) {
 			if(user_node[i] == -1)K--;
 		}
@@ -22,7 +23,9 @@ public class ClosedQueue01_main {
 		int node_index[] = new int[K];
 		
 		ClosedQueue01_main cmain = new ClosedQueue01_main();
-		cmain.getCSV2("csv/distance.csv", user_node.length, user_node.length+3, d, p, mu, node_index, user_node);
+		cmain.getCSV1("csv/disthospital2019.csv", user_node, p);
+		cmain.getCSV2("csv/distance2019.csv", user_node.length, user_node.length+3, d, p, mu, node_index, user_node);
+		//cmain.getCSV2("csv/distance2019doc.csv", user_node.length, user_node.length+3, d, p, mu, node_index, user_node);
 		
 		//確認用
 		//double d[][] = {{1000,5,8,10,15},{5,1000,3,5,3},{8,3,1000,2,4},{10,5,2,1000,3},{15,3,4,3,1000}};//行を入力
@@ -79,8 +82,112 @@ public class ClosedQueue01_main {
 		System.out.println("理論値 : 平均系内人数 = " +Arrays.toString(L));
 		System.out.println("理論値 : 平均系内時間 = " +Arrays.toString(R));
 		System.out.println("理論値 : スループット = " +Arrays.toString(lambda));
-				
+	
+		
+		
+		//---------------Simulation
+		//初期は均一でいい
+		for(int i = 0; i < p.length; i++) p[i] = 100.0/f.length;
+		//足して100になるようにする
+		int sum = 0;
+		for(int i = 0; i < p.length; i++) p[i] = Math.ceil(p[i]);
+		for(int i = 0; i < p.length; i++) sum += p[i];
+		if(sum-100 > 0) {
+			for(int i = 0; i <sum-100; i++)p[i]--;
+		}else {
+			for(int i = 0; i <100-sum; i++)p[i]++;
+		}
+		
+		
+		int simtime = 20000;
+		
+		ClosedQueue01_sim qsim = new ClosedQueue01_sim(f, simtime, f.length, N, mu, node_index, p);
+		double simulation[][] = qsim.getSimulation();
+		double evaluation[][] = qsim.getEvaluation();
+		double result[][] = new double[K][5];
+		for(int i = 0; i < result.length; i++) {
+			for(int j = 0; j < result[0].length; j++) {
+				if(j < 2 ) result[i][j] = simulation[j][i];
+				else if (j >= 2) result[i][j] = evaluation[j-2][i];
+			}
+		}
+		System.out.println("Simulation : (平均系内人数, 平均待ち人数) = "+Arrays.deepToString(simulation));
+		System.out.println("Simulation : (系内時間,系内時間分散,最大待ち人数) = "+Arrays.deepToString(evaluation));
+		System.out.println("Simulation : (平均系内人数, 平均待ち人数,系内時間,系内時間分散,最大待ち人数) = "+Arrays.deepToString(result));
+		System.out.println("Simulation : (MaxLengthTime) = "+Arrays.toString(qsim.getMaxlengthtime()));
+		System.out.println("Simulation : (時間割合) = "+Arrays.deepToString(qsim.getTimerate()));
+		System.out.println("Simulation : (同時時間割合) = "+Arrays.deepToString(qsim.getTimerate2()));
+		double[] timeratecap = qsim.getTimeratecap();
+		System.out.println("Simulation : (Cap越え時間割合) = "+Arrays.toString(timeratecap));
+		System.out.println("Simulation : (相関係数行列) = "+Arrays.deepToString(qsim.getCorrelation()));
+		
+		
+		Graph graph = new Graph(qsim, node_index,simtime);
+		graph.setBounds(5,5,755,455);
+		graph.setVisible(true);
 	}
+
+	
+	
+	private void getCSV1(String path, int[] user_node, double[] p) {
+		// TODO Auto-generated method stub
+		try {
+			File f = new File(path);
+			BufferedReader br = new BufferedReader(new FileReader(f));
+			
+			int row = 968;
+			int column = user_node.length+2;
+			String[][] data = new String[row][column]; //今回は[K][K+3]
+			String line = br.readLine();
+			for (int i = 0; line != null; i++) {
+				data[i] = line.split(",", 0);
+				line = br.readLine();
+			}
+			br.close();
+			
+			int rowindex = 0, columnindex = 0;
+			int mindist_id = 0;
+			double mindist = 100000000;
+			
+			for(int i = 0; i < user_node.length; i++) {
+				if(user_node[i] != -1) {
+					p[rowindex] = 0.0;
+					rowindex++;
+				}
+			}
+
+			// CSVから読み込んだ配列の中身を処理
+			for(int j = 0; j < row; j++) {
+				rowindex = 0;
+				mindist_id = 0;
+				mindist = 10000000.0;
+				for(int i = 0; i < user_node.length; i++) {
+					if(user_node[i] != -1) {
+						//if(mindist_id == 0)mindist_id = rowindex;
+						if(mindist > Double.parseDouble(data[j][i])) {
+							mindist = Double.parseDouble(data[j][i]);
+							mindist_id = rowindex;
+						}
+						rowindex++;
+					}
+				}
+				//System.out.println(mindist_id);
+				p[mindist_id] += Double.parseDouble(data[j][user_node.length]);
+			}
+
+			//足して100になるようにする(小数OK)
+			System.out.println("人口："+Arrays.toString(p));
+			int sum = 0;
+			for(int i = 0; i < p.length; i++) sum += p[i];
+			for(int i = 0; i < p.length; i++) p[i] = p[i]/sum*100;
+		
+
+		} catch (IOException e) {
+			System.out.println(e);
+		}
+	}
+
+
 
 	//複数種類のデータを一度に取り込む場合
 	public void getCSV2(String path, int row, int column, double[][] d, double[] p, double[] mu, int[] node_index, int[] user_node) {
@@ -109,6 +216,7 @@ public class ClosedQueue01_main {
 							}
 						}
 						else if (j == column -3) p[rowindex] = Double.parseDouble(data[i][j]);
+						//else if (j == column -3) p[rowindex] = 100.0/p.length;
 						else if (j == column -2) mu[rowindex] = Double.parseDouble(data[i][j]);
 						else if (j == column -1) node_index[rowindex] = Integer.parseInt(data[i][j]);
 					}
